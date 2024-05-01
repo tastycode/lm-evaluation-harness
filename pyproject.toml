@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lm_eval"
+format = "pyproject"
 version = "0.4.2"
 authors = [
     {name="EleutherAI", email="contact@eleuther.ai"}
@@ -37,7 +38,7 @@ dependencies = [
     "transformers>=4.1",
     "zstandard",
     "dill",
-    "word2number",
+    "word2number>=1.03",
     "more_itertools",
 ]
 
