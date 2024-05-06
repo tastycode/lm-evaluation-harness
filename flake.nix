@@ -46,7 +46,7 @@
           tqdm-multiprocess = ps.python311Packages.tqdm;
         };
       });
-  in {
+  in  {
     packages = eachSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       word2number = buildWordNumber pkgs;
@@ -57,11 +57,11 @@
       packageAttrs = pyproject.lib.renderers.buildPythonPackage {
         inherit python project;
       };
-    in
-      python.pkgs.buildPythonPackage (packageAttrs
+      corePythonPackage = python.pkgs.buildPythonPackage (packageAttrs
         // {
           #          env.CUSTOM_ENVVAR = "hello";
-        }));
+        });
+ 	in corePythonPackage);
 
     devShells = eachSystem (
       system: let
@@ -71,11 +71,18 @@
           ps = pkgs;
           inherit word2number;
         };
+        packageAttrs = pyproject.lib.renderers.buildPythonPackage {
+          inherit python project;
+        };
+        corePythonPackage = python.pkgs.buildPythonPackage (packageAttrs
+          // {
+            #          env.CUSTOM_ENVVAR = "hello";
+          });
       in {
         default = pkgs.mkShell {
-          packages = [python];
+          packages = [corePythonPackage pkgs.pdm];
         };
       }
     );
-  };
+	};
 }
