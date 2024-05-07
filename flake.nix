@@ -1,5 +1,13 @@
 {
   description = "Lockdown python dependency reproducibility, attempt 56";
+  inputs.nixpkgs.url = "github:numtide/nixpkgs-unfree";
+  inputs.nixpkgs.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
+  inputs.nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  # Optionally, pull pre-built binaries from this project's cache
+  nixConfig.extra-substituters = [ "https://numtide.cachix.org" ];
+  nixConfig.extra-trusted-public-keys = [ "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE=" ];
 
   inputs.pyproject.url = "github:nix-community/pyproject.nix";
   inputs.pyproject.inputs.nixpkgs.follows = "nixpkgs";
@@ -11,7 +19,7 @@
     systems,
     ...
   }: let
-    project = pyproject.lib.project.loadPyproject {
+    project = pyproject.lib.project.loadPDMPyproject {
       # Read & unmarshal pyproject.toml relative to this project root.
       # projectRoot is also used to set `src` for renderers such as buildPythonPackage.
       projectRoot = ./.;
@@ -35,52 +43,45 @@
             echo "from setuptools import setup; setup(name='${pname}')" > $sourceRoot/setup.py
           fi
         '';
+        propagatedBuildInputs = [
+           ps.python311Packages.tomli
+        ];
       };
       buildPython = {
-        ps,
+        pkgs,
         word2number,
       }:
-      ps.python311.override (oldAttrs: {
-        packageOverrides = self: super: {
-          inherit word2number;
-          tqdm-multiprocess = ps.python311Packages.tqdm;
-        };
-      });
-  in  {
-    packages = eachSystem (system: let
+      (pkgs.python311.override { 
+		packageOverrides = self: super: {
+                  inherit word2number;
+                };
+	}).withPackages (project.renderers.withPackages {
+               python = pkgs.python311;
+         });
+  in  rec {
+    packages = eachSystem (system: let     
       pkgs = nixpkgs.legacyPackages.${system};
       word2number = buildWordNumber pkgs;
       python = buildPython {
-        inherit word2number;
-        ps = pkgs;
-      };
-      packageAttrs = pyproject.lib.renderers.buildPythonPackage {
-        inherit python project;
-      };
-      corePythonPackage = python.pkgs.buildPythonPackage (packageAttrs
-        // {
-          #          env.CUSTOM_ENVVAR = "hello";
-        });
- 	in corePythonPackage);
+        inherit pkgs word2number;
+      }; in python);
 
     devShells = eachSystem (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
         word2number = buildWordNumber pkgs;
         python = buildPython {
-          ps = pkgs;
-          inherit word2number;
+          inherit pkgs word2number;
         };
-        packageAttrs = pyproject.lib.renderers.buildPythonPackage {
-          inherit python project;
-        };
-        corePythonPackage = python.pkgs.buildPythonPackage (packageAttrs
-          // {
-            #          env.CUSTOM_ENVVAR = "hello";
-          });
       in {
         default = pkgs.mkShell {
-          packages = [corePythonPackage pkgs.pdm];
+                preCheck = ''
+			export TMPDIR=/tmp
+
+		'';
+	  dontUnpack = true;
+          doCheck = false;
+          packages = [python pkgs.pdm];
         };
       }
     );
